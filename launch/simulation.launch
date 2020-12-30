@@ -55,6 +55,15 @@
   <node name="urdf_spawner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen"
        args="-urdf -model robot -param robot_description -x -5 -y 8 -z 0.05 -Y -1.57"/> 
 
-	 
+  <!-- Start Rviz -->  
+  <param name="use_gui" value="False"/>
+   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" ></node>
+   <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" /> 
+   <node name="rviz" pkg="rviz" type="rviz" args="-d $(find exp_assignment3)/config/sim.rviz" />
+
+  <!--Launch Gmapping package --> 
+  <include file="$(find exp_assignment3)/launch/gmapping.launch"></include>
+
+
 
 </launch>
