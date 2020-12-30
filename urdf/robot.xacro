@@ -2,7 +2,7 @@
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="robot_xacro">
 
 
-<xacro:include filename="$(find exp_assignment2)/urdf/robot.gazebo"/>
+<xacro:include filename="$(find exp_assignment3)/urdf/robot.gazebo"/>
 
 <!--	<xacro:macro name="cylinder_inertia" params="mass r l"> 
 	   <inertia ixx="${mass*(3*r*r+l*l)/12}" ixy = "0" ixz = "0"
@@ -207,7 +207,7 @@
 
 
   <joint name="neck_joint" type="fixed">
-  	<origin rpy="0 0 0" xyz="0.20 0 0"/> 
+  	<origin rpy="0 0 0" xyz="0.13 0 0"/> 
   	<parent link="link_chassis"/>
   	<child link="neck"/>
   </joint>
@@ -244,7 +244,7 @@
   
   <joint name="hokuyo_joint" type="fixed">
 	    <axis xyz="0 1 0" />
-	    <origin xyz="0.14 0 0.025" rpy="0 0 0"/>
+	    <origin xyz="0.20 0 0.025" rpy="0 0 0"/>
 	    <parent link="link_chassis"/>
 	    <child link="hokuyo_link"/> 
 	 </joint>
