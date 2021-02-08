@@ -249,13 +249,13 @@
       <inertia ixx="0.000010279" ixy="0" ixz="0" iyy="0.000010279" iyz="0" izz="0.000007225"/>
     </inertial>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.08"/>
+      <origin rpy="0 0 0" xyz="0 0 0.07"/>
       <geometry>
         <cylinder length="0.08" radius="0.04"/>
       </geometry>
     </collision>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.08"/>
+      <origin rpy="0 0 0" xyz="0 0 0.07"/>
       <geometry>
         <cylinder length="0.08" radius="0.04"/>
       </geometry>
@@ -265,17 +265,17 @@
   <link name="head">
     <inertial>
       <mass value="0.025"/>
-      <origin rpy="0 0 0" xyz="0 0 0.18"/>
+      <origin rpy="0 0 0" xyz="0 0 0.15"/>
       <inertia ixx="0.000010279" ixy="0" ixz="0" iyy="0.000010279" iyz="0" izz="0.000007225"/>
     </inertial>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.18"/>
+      <origin rpy="0 0 0" xyz="0 0 0.16"/>
       <geometry>
         <box size="0.1 0.1 0.1"/>
       </geometry>
     </collision>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0.18"/>
+      <origin rpy="0 0 0" xyz="0 0 0.16"/>
       <geometry>
         <box size="0.1 0.1 0.1"/>
       </geometry>
@@ -304,15 +304,15 @@
       <inertia ixx="1e-6" ixy="0" ixz="0" iyy="1e-6" iyz="0" izz="1e-6"/>
     </inertial>
   </link>
+  <joint name="neck_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0.20 0 0"/>
+    <parent link="link_chassis"/>
+    <child link="neck"/>
+  </joint>
   <joint name="head_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <parent link="neck"/>
     <child link="head"/>
-  </joint>
-  <joint name="neck_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0.13 0 0"/>
-    <parent link="link_chassis"/>
-    <child link="neck"/>
   </joint>
   <joint name="camera_joint" type="fixed">
     <axis xyz="1 0 0"/>
@@ -344,9 +344,8 @@
   </link>
   <joint name="hokuyo_joint" type="fixed">
     <axis xyz="0 1 0"/>
-    <origin rpy="0 0 0" xyz="0.20 0 0.025"/>
+    <origin rpy="0 0 0" xyz="0.26 0 0.025"/>
     <parent link="link_chassis"/>
     <child link="hokuyo_link"/>
   </joint>
 </robot>
-
