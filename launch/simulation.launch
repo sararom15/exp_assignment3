@@ -64,6 +64,9 @@
   <!--Launch Gmapping package --> 
   <include file="$(find exp_assignment3)/launch/gmapping.launch"></include>
 
+  <!--Launch Move Base package--> 
+  <include file="$(find planning)/launch/move_base.launch"></include>
+
 
 
 </launch>
