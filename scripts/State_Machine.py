@@ -42,6 +42,10 @@ import actionlib.msg
 # Brings in the .action file and messages used by the move base action
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
+import matplotlib.pyplot as plt
+import signal 
+import subprocess 
+import roslaunch
 
 global DetectedBall 
 global CloseBall
@@ -49,6 +53,9 @@ global ColorBall
 global balls
 global rooms
 global CommandForSleeping
+global Finding
+global Target 
+
 
 ## client of actionlib server for moving the dog robot using MOVEBASE package
 def move_dog(target): 
@@ -164,7 +171,7 @@ def Detect_Ball_clbk(ros_data):
             center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
             ## only proceed if the radius meets a minimum size
-            if radius > 10: 
+            if radius > 5: 
                 cv2.circle(image_np, (int(x), int(y)), int(radius),
                             (0, 255, 255), 2)
                 cv2.circle(image_np, center, 5, (0, 0, 255), -1)
@@ -178,7 +185,7 @@ def Detect_Ball_clbk(ros_data):
                 vel.angular.z = -0.002*(center[0]-400)
                 vel.linear.x = -0.01*(radius-100) 
                 vel_pub.publish(vel)
-                if (vel.linear.x < 0.01) & (vel.angular.z < 0.01): 
+                if (vel.linear.x < 0.09) & (vel.angular.z < 0.09): 
                     rospy.set_param('CloseBall',1) 
             #    vel.angular.z = 0
             #    vel.linear.x = 0
@@ -216,17 +223,25 @@ class Normal(smach.State):
 
         while True: 
             self.counter = self.counter + 1 
-            #move_dog([random.randrange(-6,6), random.randrange(-6,3)])
 
+            Normal = move_dog([random.randrange(-6,6), random.randrange(-6,3)])
+            
             if rospy.get_param('DetectedBall') == 1: 
                 return 'track_ball'
+             
 
             if rospy.get_param('CommandForSleeping') == 1: 
                 return 'go_to_sleep' 
 
 
-            if self.counter == 50000:
+            if self.counter == 5000:
                 self.counter = 0
+                command = rospy.wait_for_message("UserCommand", String) 
+                rospy.loginfo('it is Time to play: %s', command.data)
+                res = command.data.split() 
+                rospy.set_param('Target', res[1])
+                rospy.loginfo('%s', res[1]) 
+
                 return 'go_to_play' 
 
 
@@ -298,33 +313,31 @@ class Normal_Track(smach.State):
 
         DetectedBall2 = rospy.Subscriber("camera1/image_raw/compressed", 
                                     CompressedImage, Detect_Ball_clbk, queue_size=1)
-
+        time.sleep(3) 
         if rospy.get_param('CloseBall') == 1: 
             rospy.loginfo('store position')
 
-            """
-            ## initialization for rooms 
-        
-            rooms = [   Room('LivingRoom', 'green', 0, 0),
-                        Room('Kitchen', 'yellow', 0, 0),
-                        Room('Closet', 'red',0, 0),
-                        Room('Entrance', 'blue',0, 0),
-                        Room('Bathroom','magenta',0, 0),
-                        Room('Bedroom', 'black', 0, 0)]
-            """ 
 
-            for room in rooms: 
-                room.color = rospy.get_param('ColorBall') 
-                room.x = position.x 
-                room.y = position.y 
-            
-            rospy.loginfo('I am in x = %x, y = %s , in the %s', room.x, room.y, room.name) 
+            ColorBall = rospy.get_param('ColorBall')
+            time.sleep(5)
+
+            ## check index in the list for detected ball color
+            for index, room in enumerate(rooms): 
+                if room.color == rospy.get_param('ColorBall'): 
+                    rospy.loginfo('%x', index)
+                    break 
+                else: 
+                    index = -1 
+                    rospy.loginfo('Error')
+
+            rooms[index].x = position.x 
+            rooms[index].y = position.y 
+
+            rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name) 
 
             rospy.set_param('CloseBall',0)
             rospy.set_param('DetectedBall',0)
 
-
-    
         time.sleep(20) 
         return 'done'
 
@@ -365,23 +378,29 @@ class Play(smach.State):
 
     ##execution 
     def execute(self, userdata): 
-        command = rospy.wait_for_message("UserCommand", String) 
-        rospy.loginfo('%s', command.data)
-        res = command.data.split() 
-        rospy.loginfo('%s', res[1]) 
-        for i in rooms:     
-            while i.name == res[1]: 
-                rospy.loginfo('%s', i.name)
-                if (i.x == 0) & (i.y == 0): 
-                    rospy.loginfo('The room %s has not been discovered yet, lets find it', i.name)         
-                    return 'play_to_find'
-                else:
-                    rospy.loginfo('I know where is %s, lets go there!', i.name)
-                    move_dog([i.x, i.y])      
-                    return 'play_to_normal'
 
+        rospy.loginfo('my target is %s', rospy.get_param('Target'))
 
+        ## check the index of the list of the room which corresponds to our target
+        for index_, room in enumerate(rooms):     
+            if room.name == rospy.get_param('Target'): 
+                break
+            else: 
+                index_ = -1 
+                rospy.loginfo('Error')
         
+
+        if (rooms[index_].x == 0) & (rooms[index_].y == 0): 
+            rospy.loginfo('The room %s has not been discovered yet, lets find it', rooms[index_].name)   
+            rospy.set_param('Finding',1) 
+            return 'play_to_find'  
+        else: 
+            rospy.loginfo('I know where is %s, lets go there!', rooms[index_].name)
+            play = move_dog([rooms[index_].x, rooms[index_].y])  
+            if play: 
+                rospy.loginfo('Achieved Target!')
+
+                return 'play_to_normal'
 
 ## Find State
 class Find(smach.State): 
@@ -393,9 +412,40 @@ class Find(smach.State):
 
     ##execution 
     def execute(self, userdata): 
-        DetectedBall3 = rospy.Subscriber("camera1/image_raw/compressed", 
-                            CompressedImage, Detect_Ball_clbk, queue_size=1)
-        return 'track_place'
+
+        if rospy.get_param('Finding') == 1: 
+
+            DetectedBall3 = rospy.Subscriber("camera1/image_raw/compressed", 
+                                CompressedImage, Detect_Ball_clbk, queue_size=1)
+
+            ## launch explore package 
+            p = subprocess.Popen(["roslaunch","exp_assignment3","explore.launch"])
+
+            while True: 
+                a = rospy.get_param('DetectedBall')
+
+                ## if a ball has been detected 
+                if a == 1: 
+                    DetectedBall3.unregister() 
+                ## kill the explore process 
+                    p.send_signal(signal.SIGINT) 
+                    
+                    return 'track_place'
+
+            """
+            while True: 
+                a = rospy.get_param('DetectedBall') 
+            if a == 1:       
+                DetectedBall3.unregister() 
+                l.send_signal(signal.SIGINT)
+                return 'track_place'
+            """
+
+        if rospy.get_param('Finding') == 0: 
+            return 'go_to_play'
+        
+
+
 
 ## Find Track state
 class Find_Track(smach.State): 
@@ -407,7 +457,36 @@ class Find_Track(smach.State):
 
     ##execution 
     def execute(self, userdata): 
-        time.sleep(2000)
+        
+        DetectedBall3 = rospy.Subscriber("camera1/image_raw/compressed", 
+                    CompressedImage, Detect_Ball_clbk, queue_size=1)
+        
+        rospy.set_param('Finding',0)
+
+        
+        if rospy.get_param('CloseBall') == 1: 
+            rospy.loginfo('store position')
+            time.sleep(5)
+
+            
+            for ind, room in enumerate(rooms): 
+                if room.color == rospy.get_param('ColorBall'): 
+                    break
+                else:
+                    ind = -1 
+                    rospy.loginfo('Error')
+            
+            rooms[ind].x = position.x 
+            rooms[ind].y = position.y 
+            rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[ind].x, rooms[ind].y, rooms[ind].name)
+            DetectedBall3.unregister()
+             
+
+            rospy.set_param('CloseBall',0)
+            rospy.set_param('DetectedBall',0)
+            
+        
+        time.sleep(20)
         return 'found'
 
 
@@ -420,6 +499,7 @@ def main():
     rospy.set_param('DetectedBall', 0) 
     rospy.set_param('CloseBall',0)
     rospy.set_param('CommandForSleeping',0)
+    rospy.set_param('Finding',0) 
 
 
     ## Create a main SMACH state machine
@@ -480,7 +560,7 @@ def main():
 
     # Wait for ctrl-c to stop the application
     rospy.spin()
-    #sis.stop()
+    sis.stop()
 
 
 if __name__ == '__main__':
