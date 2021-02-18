@@ -42,19 +42,51 @@ import actionlib.msg
 # Brings in the .action file and messages used by the move base action
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
+# msg 
+from exp_assignment3.msg import BallInfoMsg
+
 import matplotlib.pyplot as plt
 import signal 
 import subprocess 
 import roslaunch
 
-global DetectedBall 
-global CloseBall
-global ColorBall
-global balls
+
 global rooms
 global CommandForSleeping
 global Finding
 global Target 
+
+
+## Callback for InfoBall 
+InfoBall = BallInfoMsg() 
+def clbk_ball(info): 
+    global InfoBall
+    InfoBall.detected = info.detected.data
+    InfoBall.color = info.color.data
+    InfoBall.radius = info.radius.data 
+    InfoBall.centerx = info.centerx.data
+    InfoBall.centerx = info.centery.data
+
+## Callback for the command
+usercommand = String() 
+def clbk_command(data): 
+    usercommand = data.data
+
+## Callback for the position
+position = Point() 
+yaw = 0 
+## callback for odometry 
+def clbk_odometry(msg): 
+    global position 
+    position = msg.pose.pose.position
+    ## yaw
+    quaternion = (
+        msg.pose.pose.orientation.x,
+        msg.pose.pose.orientation.y,
+        msg.pose.pose.orientation.z,
+        msg.pose.pose.orientation.w)
+    euler = transformations.euler_from_quaternion(quaternion)
+    yaw_ = euler[2]
 
 
 ## client of actionlib server for moving the dog robot using MOVEBASE package
@@ -81,16 +113,9 @@ def move_dog(target):
     client.send_goal(goal)
 
     # cancel goal 
-    DetectedBall = rospy.Subscriber("camera1/image_raw/compressed", 
-                                    CompressedImage, Detect_Ball_clbk, queue_size=1)
-
     while True:     
-
-        if rospy.get_param('DetectedBall') == 1:
-            DetectedBall.unregister() 
+        if InfoBall.detected == True: 
             return client.cancel_goal()
-
-
 
 
    # Waits for the server to finish performing the action.
@@ -101,17 +126,15 @@ def move_dog(target):
         rospy.signal_shutdown("Action server not available!")
     else:
     # Result of executing the action
+        return client.get_result()  
 
-        return client.get_result()   
 
 
-## Publisher
-image_pub = rospy.Publisher("/output/image_raw/compressed",
-                                    CompressedImage, queue_size=1)
 
-vel_pub = rospy.Publisher("/cmd_vel",
-                                Twist, queue_size=1)
 
+
+
+"""
 ## class for imformations about balls 
 class Ball: 
     def __init__(self, color, lower, upper): 
@@ -136,7 +159,7 @@ def Detect_Ball_clbk(ros_data):
     ## direct conversion to CV2 
     np_arr = np.fromstring(ros_data.data, np.uint8)
     image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)  # OpenCV >= 3.0:
-    """
+    
     ## initialization of balls 
     balls = [   Ball('green',(50, 50, 20),(70, 255, 255)),
                 Ball('yellow',(25, 50, 20),(32, 255, 255)),
@@ -144,7 +167,7 @@ def Detect_Ball_clbk(ros_data):
                 Ball('blue',(105, 50, 20),(135, 255, 255)),
                 Ball('pink',(143, 50, 20),(160, 255, 255)),
                 Ball('black',(0, 0, 0),(179, 255, 10))]
-    """
+    
 
     blurred = cv2.GaussianBlur(image_np, (11, 11), 0)
     hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)        
@@ -202,6 +225,8 @@ def Detect_Ball_clbk(ros_data):
         ## show window 
         cv2.imshow('window', image_np)
         cv2.waitKey(2)
+"""
+
 
 ## function with an implemented timer for sleeping
 def TimeToGoToSleep(): 
@@ -216,17 +241,21 @@ class Normal(smach.State):
     def __init__(self):
         ## 3 outcomes defined 
         smach.State.__init__(self, outcomes=['go_to_sleep','go_to_play','track_ball'])
+
         self.counter = 0 
 
     ## execution 
     def execute(self, userdata):
 
         while True: 
-            self.counter = self.counter + 1 
+            self.counter = self.counter + 1
 
             Normal = move_dog([random.randrange(-6,6), random.randrange(-6,3)])
+            if Normal: 
+                rospy.loginfo('Goal achieved!')
+
             
-            if rospy.get_param('DetectedBall') == 1: 
+            if InfoBall.detected == True: 
                 return 'track_ball'
              
 
@@ -244,42 +273,7 @@ class Normal(smach.State):
 
                 return 'go_to_play' 
 
-
-        
-        """
-        while True: 
-            self.command = user_action() 
-            rospy.loginfo('command received is %s', self.command) 
-
-            ## first case: command is to go to sleep 
-            if self.command == "sleep": 
-                ## switch in sleep state
-                return 'go_to_sleep'
-
-            if self.command == "normal":
-                ## move randomly 
-                move_dog([random.randrange(-8,), random.randrange(-8,8)])
-
-                ## SWITCH IN FIND SUB STATE IF THE MAP IS NOT DISCOVERED YET 
-        """
-
-
-
-position = Point() 
-yaw = 0 
-
-## callback for odometry 
-def clbk_odometry(msg): 
-    global position 
-    position = msg.pose.pose.position
-    ## yaw
-    quaternion = (
-        msg.pose.pose.orientation.x,
-        msg.pose.pose.orientation.y,
-        msg.pose.pose.orientation.z,
-        msg.pose.pose.orientation.w)
-    euler = transformations.euler_from_quaternion(quaternion)
-    yaw_ = euler[2]
+            
 
 
 ## class for information about rooms 
@@ -299,6 +293,10 @@ rooms = [   Room('LivingRoom', 'green', 0, 0),
             Room('Bathroom','magenta',0, 0),
             Room('Bedroom', 'black', 0, 0)]
 
+vel_pub = rospy.Publisher("/cmd_vel",
+                                Twist, queue_size=1)
+
+
 ## Normal_Track state
 class Normal_Track(smach.State): 
 
@@ -309,34 +307,37 @@ class Normal_Track(smach.State):
 
     ## execution 
     def execute(self, userdata):
-        
 
-        DetectedBall2 = rospy.Subscriber("camera1/image_raw/compressed", 
-                                    CompressedImage, Detect_Ball_clbk, queue_size=1)
-        time.sleep(3) 
-        if rospy.get_param('CloseBall') == 1: 
-            rospy.loginfo('store position')
+        time.sleep(2) 
+        while True: 
+            rospy.loginfo('The %s ball has been detected!', InfoBall.color)
+            rospy.loginfo('The centerx is %s', InfoBall.centerx)
+            rospy.loginfo('The radius is %s', InfoBall.radius)
+            ## follow the ball
+            vel = Twist()
+            vel.angular.z = 0.002*(InfoBall.centerx -400)
+            vel.linear.x = -0.01*(InfoBall.radius - 100) 
+            vel_pub.publish(vel)
+
+            ## Store position 
+            if (vel.linear.x < 0.09) & (vel.angular.z < 0.09): 
+                rospy.loginfo('Achieved the %s ball! Lets store the position!', InfoBall.color)
+                time.sleep(2) 
+
+        for index, room in enumerate(rooms): 
+            if room.color == InfoBall.color: 
+                rospy.loginfo('%x', index)
+                break
+            else: 
+                index = -1 
+                rospy.loginfo('error')
 
 
-            ColorBall = rospy.get_param('ColorBall')
-            time.sleep(5)
+        rooms[index].x = position.x 
+        rooms[index].y = position.y 
 
-            ## check index in the list for detected ball color
-            for index, room in enumerate(rooms): 
-                if room.color == rospy.get_param('ColorBall'): 
-                    rospy.loginfo('%x', index)
-                    break 
-                else: 
-                    index = -1 
-                    rospy.loginfo('Error')
+        rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name) 
 
-            rooms[index].x = position.x 
-            rooms[index].y = position.y 
-
-            rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name) 
-
-            rospy.set_param('CloseBall',0)
-            rospy.set_param('DetectedBall',0)
 
         time.sleep(20) 
         return 'done'
@@ -363,10 +364,6 @@ class Sleep(smach.State):
 
         return 'sleep_to_normal'
 
-usercommand = String() 
-
-def clbk_command(data): 
-    usercommand = data.data
 
 ## Play State 
 class Play(smach.State): 
@@ -415,31 +412,16 @@ class Find(smach.State):
 
         if rospy.get_param('Finding') == 1: 
 
-            DetectedBall3 = rospy.Subscriber("camera1/image_raw/compressed", 
-                                CompressedImage, Detect_Ball_clbk, queue_size=1)
-
             ## launch explore package 
             p = subprocess.Popen(["roslaunch","exp_assignment3","explore.launch"])
 
             while True: 
-                a = rospy.get_param('DetectedBall')
-
                 ## if a ball has been detected 
-                if a == 1: 
-                    DetectedBall3.unregister() 
-                ## kill the explore process 
+                if InfoBall.detected == 1: 
+                    ## kill the explore process 
                     p.send_signal(signal.SIGINT) 
-                    
+                    time.sleep(7)
                     return 'track_place'
-
-            """
-            while True: 
-                a = rospy.get_param('DetectedBall') 
-            if a == 1:       
-                DetectedBall3.unregister() 
-                l.send_signal(signal.SIGINT)
-                return 'track_place'
-            """
 
         if rospy.get_param('Finding') == 0: 
             return 'go_to_play'
@@ -454,38 +436,39 @@ class Find_Track(smach.State):
 
         smach.State.__init__(self, outcomes=['found'])
 
-
     ##execution 
     def execute(self, userdata): 
         
-        DetectedBall3 = rospy.Subscriber("camera1/image_raw/compressed", 
-                    CompressedImage, Detect_Ball_clbk, queue_size=1)
-        
+
         rospy.set_param('Finding',0)
 
+        rospy.loginfo('The %s ball has been detected!', InfoBall.color)
         
-        if rospy.get_param('CloseBall') == 1: 
-            rospy.loginfo('store position')
-            time.sleep(5)
+        ## follow the ball
+        vel = Twist()
+        vel.angular.z = -0.002*(InfoBall.centerx-400)
+        vel.linear.x = -0.01*(InfoBall.radius-100) 
+        vel_pub.publish(vel)
 
-            
-            for ind, room in enumerate(rooms): 
-                if room.color == rospy.get_param('ColorBall'): 
+        ## Store position 
+        if (vel.linear.x < 0.09) & (vel.angular.z < 0.09): 
+            rospy.loginfo('Achieved the %s ball! Lets store the position!', InfoBall.color)
+            time.sleep(2) 
+
+            for index, room in enumerate(rooms): 
+                if room.color == InfoBall.color: 
+                    rospy.loginfo('%x', index)
                     break
-                else:
-                    ind = -1 
-                    rospy.loginfo('Error')
-            
-            rooms[ind].x = position.x 
-            rooms[ind].y = position.y 
-            rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[ind].x, rooms[ind].y, rooms[ind].name)
-            DetectedBall3.unregister()
-             
+                else: 
+                    index = -1 
+                    rospy.loginfo('error')
 
-            rospy.set_param('CloseBall',0)
-            rospy.set_param('DetectedBall',0)
-            
-        
+
+            rooms[index].x = position.x 
+            rooms[index].y = position.y 
+
+            rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name) 
+
         time.sleep(20)
         return 'found'
 
@@ -496,8 +479,7 @@ def main():
     rospy.init_node('state_machine')
     rospy.Subscriber("/odom", Odometry, clbk_odometry)
     rospy.Subscriber("/UserCommand", String, clbk_command)
-    rospy.set_param('DetectedBall', 0) 
-    rospy.set_param('CloseBall',0)
+    rospy.Subscriber("/InfoBalls", BallInfoMsg, clbk_ball)
     rospy.set_param('CommandForSleeping',0)
     rospy.set_param('Finding',0) 
 
