@@ -11,6 +11,7 @@ import roslib
 import time
 import math
 import random
+import sys 
 
 #smach library 
 import smach 
@@ -52,20 +53,29 @@ import roslaunch
 
 
 global rooms
-global CommandForSleeping
+global play 
+global sleep
 global Finding
 global Target 
 
 
+
 ## Callback for InfoBall 
 InfoBall = BallInfoMsg() 
+InfoBall.detected = False 
+InfoBall.radius = 0 
+InfoBall.centerx = 0 
+InfoBall.closeball = 0
+InfoBall.firstdetection = 0 
+
 def clbk_ball(info): 
     global InfoBall
     InfoBall.detected = info.detected.data
     InfoBall.color = info.color.data
     InfoBall.radius = info.radius.data 
     InfoBall.centerx = info.centerx.data
-    InfoBall.centerx = info.centery.data
+    InfoBall.closeball = info.closeball.data
+    InfoBall.firstdetection = info.firstdetection.data
 
 ## Callback for the command
 usercommand = String() 
@@ -75,6 +85,7 @@ def clbk_command(data):
 ## Callback for the position
 position = Point() 
 yaw = 0 
+
 ## callback for odometry 
 def clbk_odometry(msg): 
     global position 
@@ -113,8 +124,8 @@ def move_dog(target):
     client.send_goal(goal)
 
     # cancel goal 
-    while True:     
-        if InfoBall.detected == True: 
+    while True: 
+        if InfoBall.firstdetection == 1:  
             return client.cancel_goal()
 
 
@@ -128,152 +139,6 @@ def move_dog(target):
     # Result of executing the action
         return client.get_result()  
 
-
-
-
-
-
-
-"""
-## class for imformations about balls 
-class Ball: 
-    def __init__(self, color, lower, upper): 
-        self.color = color
-        self.lower = lower 
-        self.upper = upper 
-        self.visible = False
-
-
-## initialization of balls 
-balls = [   Ball('green',(50, 50, 20),(70, 255, 255)),
-            Ball('yellow',(25, 50, 20),(32, 255, 255)),
-            Ball('red',(0, 50, 100),(12, 255, 255)),
-            Ball('blue',(105, 50, 20),(135, 255, 255)),
-            Ball('pink',(143, 50, 20),(160, 255, 255)),
-            Ball('black',(0, 0, 0),(179, 255, 10))]
-
-
-## detection Ball 
-def Detect_Ball_clbk(ros_data): 
-    
-    ## direct conversion to CV2 
-    np_arr = np.fromstring(ros_data.data, np.uint8)
-    image_np = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)  # OpenCV >= 3.0:
-    
-    ## initialization of balls 
-    balls = [   Ball('green',(50, 50, 20),(70, 255, 255)),
-                Ball('yellow',(25, 50, 20),(32, 255, 255)),
-                Ball('red',(0, 50, 100),(12, 255, 255)),
-                Ball('blue',(105, 50, 20),(135, 255, 255)),
-                Ball('pink',(143, 50, 20),(160, 255, 255)),
-                Ball('black',(0, 0, 0),(179, 255, 10))]
-    
-
-    blurred = cv2.GaussianBlur(image_np, (11, 11), 0)
-    hsv = cv2.cvtColor(blurred, cv2.COLOR_BGR2HSV)        
-    
-    ## Compute the center and the radius if the ball is visible 
-    for ball in balls: 
-
-
-        mask = cv2.inRange(hsv, ball.lower, ball.upper)
-        mask = cv2.erode(mask, None, iterations=2)
-        mask = cv2.dilate(mask, None, iterations=2)
-    
-        cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
-                                cv2.CHAIN_APPROX_SIMPLE)
-
-        cnts = imutils.grab_contours(cnts)
-        center = None
-
-        ## only proceed if at least one contour was found
-        if len(cnts) > 0:
-            c = max(cnts, key=cv2.contourArea)
-            ((x, y), radius) = cv2.minEnclosingCircle(c)
-            M = cv2.moments(c)
-            center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
-
-            ## only proceed if the radius meets a minimum size
-            if radius > 5: 
-                cv2.circle(image_np, (int(x), int(y)), int(radius),
-                            (0, 255, 255), 2)
-                cv2.circle(image_np, center, 5, (0, 0, 255), -1)
-                if ball.visible == False: 
-                    rospy.set_param('DetectedBall',1) 
-                ball.visible = True 
-                rospy.loginfo_once('the %s ball is here!', ball.color)
-                color = ball.color
-                rospy.set_param('ColorBall', ball.color)
-                vel = Twist()
-                vel.angular.z = -0.002*(center[0]-400)
-                vel.linear.x = -0.01*(radius-100) 
-                vel_pub.publish(vel)
-                if (vel.linear.x < 0.09) & (vel.angular.z < 0.09): 
-                    rospy.set_param('CloseBall',1) 
-            #    vel.angular.z = 0
-            #    vel.linear.x = 0
-            #    vel_pub.publish(vel) 
-        ## the ball is not found 
-    #else:
-
-    #    vel_ = Twist()
-    #    ## set an angular velocity to search around 
-    #    vel_.angular.z = 0.5 
-    #    vel_pub.publish(vel_) 
-
-
-        ## show window 
-        cv2.imshow('window', image_np)
-        cv2.waitKey(2)
-"""
-
-
-## function with an implemented timer for sleeping
-def TimeToGoToSleep(): 
-    time.sleep(400) 
-    rospy.set_param('CommandForSleeping',1) 
-
-
-## Normal State
-class Normal(smach.State): 
-    
-    ## inizialization
-    def __init__(self):
-        ## 3 outcomes defined 
-        smach.State.__init__(self, outcomes=['go_to_sleep','go_to_play','track_ball'])
-
-        self.counter = 0 
-
-    ## execution 
-    def execute(self, userdata):
-
-        while True: 
-            self.counter = self.counter + 1
-
-            Normal = move_dog([random.randrange(-6,6), random.randrange(-6,3)])
-            if Normal: 
-                rospy.loginfo('Goal achieved!')
-
-            
-            if InfoBall.detected == True: 
-                return 'track_ball'
-             
-
-            if rospy.get_param('CommandForSleeping') == 1: 
-                return 'go_to_sleep' 
-
-
-            if self.counter == 5000:
-                self.counter = 0
-                command = rospy.wait_for_message("UserCommand", String) 
-                rospy.loginfo('it is Time to play: %s', command.data)
-                res = command.data.split() 
-                rospy.set_param('Target', res[1])
-                rospy.loginfo('%s', res[1]) 
-
-                return 'go_to_play' 
-
-            
 
 
 ## class for information about rooms 
@@ -293,9 +158,72 @@ rooms = [   Room('LivingRoom', 'green', 0, 0),
             Room('Bathroom','magenta',0, 0),
             Room('Bedroom', 'black', 0, 0)]
 
-vel_pub = rospy.Publisher("/cmd_vel",
-                                Twist, queue_size=1)
 
+## User Action function 
+def user_action(): 
+    ## random choice between search for the ball or go to sleep 
+    return random.choice(['play', 'sleep'])
+
+
+
+## Normal State
+class Normal(smach.State): 
+    
+    ## inizialization
+    def __init__(self):
+        ## 3 outcomes defined 
+        smach.State.__init__(self, outcomes=['go_to_sleep','go_to_play','track_ball'])
+        self.counter = 0 
+        self.userAction = String() 
+
+    ## execution 
+    def execute(self, userdata):
+
+        ## Check if the ball has been detected before
+        for index, room in enumerate(rooms): 
+            if room.color == InfoBall.color: 
+                rospy.loginfo('%x', index)
+                break
+        
+
+        while True: 
+            self.counter = self.counter + 1
+                
+            #Normal = move_dog([random.randrange(-6,6), random.randrange(-6,3)])
+            #if Normal: 
+            #    rospy.loginfo('Goal achieved!')
+            
+
+            if InfoBall.firstdetection == 1: 
+                rospy.loginfo('the ball has not been detected before!')
+                return 'track_ball'
+                
+
+            if self.counter == 5:
+                self.counter = 0
+                self.userAction = user_action() 
+                rospy.loginfo('the user action is %s', self.userAction)
+                if self.userAction == "play": 
+                    command = rospy.wait_for_message("UserCommand", String) 
+                    rospy.loginfo('it is Time to play: %s', command.data)
+                    res = command.data.split() 
+                    rospy.set_param('Target', res[1])
+                    rospy.loginfo('%s', res[1]) 
+                    return 'go_to_play' 
+
+                if self.userAction == "sleep": 
+                    return 'go_to_sleep'
+
+
+
+vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
+vel = Twist()
+vel.linear.x = 0 
+vel.linear.y = 0 
+vel.linear.z = 0 
+vel.angular.x = 0 
+vel.angular.y = 0 
+vel.angular.z = 0 
 
 ## Normal_Track state
 class Normal_Track(smach.State): 
@@ -308,38 +236,30 @@ class Normal_Track(smach.State):
     ## execution 
     def execute(self, userdata):
 
-        time.sleep(2) 
-        while True: 
-            rospy.loginfo('The %s ball has been detected!', InfoBall.color)
-            rospy.loginfo('The centerx is %s', InfoBall.centerx)
-            rospy.loginfo('The radius is %s', InfoBall.radius)
-            ## follow the ball
-            vel = Twist()
-            vel.angular.z = 0.002*(InfoBall.centerx -400)
-            vel.linear.x = -0.01*(InfoBall.radius - 100) 
-            vel_pub.publish(vel)
+        rospy.loginfo('lets follow the ball')
 
-            ## Store position 
-            if (vel.linear.x < 0.09) & (vel.angular.z < 0.09): 
-                rospy.loginfo('Achieved the %s ball! Lets store the position!', InfoBall.color)
-                time.sleep(2) 
+        while InfoBall.closeball == -1: 
+            #rospy.loginfo('ball is far')
+            vel.angular.z = -0.002 * (InfoBall.centerx - 400) 
+            vel.linear.x = -0.01 * (InfoBall.radius - 100) 
+            vel_pub.publish(vel) 
+
+        vel.linear.x = 0 
+        vel.angular.z = 0 
+        vel_pub.publish(vel)
+
 
         for index, room in enumerate(rooms): 
             if room.color == InfoBall.color: 
                 rospy.loginfo('%x', index)
                 break
-            else: 
-                index = -1 
-                rospy.loginfo('error')
 
-
+        rospy.loginfo('Ball reached. Lets store the position')
         rooms[index].x = position.x 
         rooms[index].y = position.y 
+        rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name)
 
-        rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name) 
-
-
-        time.sleep(20) 
+        time.sleep(5) 
         return 'done'
 
 
@@ -352,16 +272,12 @@ class Sleep(smach.State):
         #outcome to be back in normal state
         smach.State.__init__(self, outcomes=['sleep_to_normal'])
 
-
-
     ##execution 
     def execute(self, userdata): 
         rospy.loginfo('Go to sleep')
         move_dog([-5,8])
-
         ## sleep for a while
         time.sleep(14) 
-
         return 'sleep_to_normal'
 
 
@@ -382,10 +298,7 @@ class Play(smach.State):
         for index_, room in enumerate(rooms):     
             if room.name == rospy.get_param('Target'): 
                 break
-            else: 
-                index_ = -1 
-                rospy.loginfo('Error')
-        
+
 
         if (rooms[index_].x == 0) & (rooms[index_].y == 0): 
             rospy.loginfo('The room %s has not been discovered yet, lets find it', rooms[index_].name)   
@@ -416,11 +329,14 @@ class Find(smach.State):
             p = subprocess.Popen(["roslaunch","exp_assignment3","explore.launch"])
 
             while True: 
-                ## if a ball has been detected 
-                if InfoBall.detected == 1: 
+                ## if a ball has been detected
+                if InfoBall.firstdetection == 1: 
                     ## kill the explore process 
                     p.send_signal(signal.SIGINT) 
-                    time.sleep(7)
+                    for i in range(0,7): 
+                        vel.linear.x = 0 
+                        vel_pub.publish(vel)
+                    #time.sleep(7)
                     return 'track_place'
 
         if rospy.get_param('Finding') == 0: 
@@ -441,35 +357,31 @@ class Find_Track(smach.State):
         
 
         rospy.set_param('Finding',0)
-
         rospy.loginfo('The %s ball has been detected!', InfoBall.color)
         
-        ## follow the ball
-        vel = Twist()
-        vel.angular.z = -0.002*(InfoBall.centerx-400)
-        vel.linear.x = -0.01*(InfoBall.radius-100) 
+        while InfoBall.closeball == -1: 
+            #rospy.loginfo('ball is far')
+            vel.angular.z = -0.002 * (InfoBall.centerx - 400) 
+            vel.linear.x = -0.01 * (InfoBall.radius - 100) 
+            vel_pub.publish(vel) 
+
+        vel.linear.x = 0 
+        vel.angular.z = 0 
         vel_pub.publish(vel)
 
-        ## Store position 
-        if (vel.linear.x < 0.09) & (vel.angular.z < 0.09): 
-            rospy.loginfo('Achieved the %s ball! Lets store the position!', InfoBall.color)
-            time.sleep(2) 
 
-            for index, room in enumerate(rooms): 
-                if room.color == InfoBall.color: 
-                    rospy.loginfo('%x', index)
-                    break
-                else: 
-                    index = -1 
-                    rospy.loginfo('error')
+        for index, room in enumerate(rooms): 
+            if room.color == InfoBall.color: 
+                rospy.loginfo('%x', index)
+                break
 
+        rospy.loginfo('Ball reached. Lets store the position')
+        rooms[index].x = position.x 
+        rooms[index].y = position.y 
+        rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name)
 
-            rooms[index].x = position.x 
-            rooms[index].y = position.y 
+        time.sleep(4) 
 
-            rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name) 
-
-        time.sleep(20)
         return 'found'
 
 
@@ -477,12 +389,14 @@ class Find_Track(smach.State):
 def main(): 
 
     rospy.init_node('state_machine')
+    rospy.Subscriber("/InfoBalls", BallInfoMsg, clbk_ball)
     rospy.Subscriber("/odom", Odometry, clbk_odometry)
     rospy.Subscriber("/UserCommand", String, clbk_command)
-    rospy.Subscriber("/InfoBalls", BallInfoMsg, clbk_ball)
-    rospy.set_param('CommandForSleeping',0)
     rospy.set_param('Finding',0) 
 
+
+
+    
 
     ## Create a main SMACH state machine
 
@@ -548,4 +462,5 @@ def main():
 if __name__ == '__main__':
     main()
     TimeToGoToSleep() 
+
 

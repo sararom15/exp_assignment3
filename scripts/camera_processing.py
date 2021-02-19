@@ -11,6 +11,7 @@ import roslib
 import time
 import math
 import random
+import sys 
 
 #message ros 
 from geometry_msgs.msg import Point, Twist, Pose, PoseStamped 
@@ -35,35 +36,42 @@ from sensor_msgs.msg import CompressedImage
 #msg 
 from exp_assignment3.msg import BallInfoMsg
 
-global ColorBallDetected
+
+global balls 
+
 ## class for imformations about balls 
 class Ball: 
-    def __init__(self, color, lower, upper, radius, centerx, centery): 
+    def __init__(self, color, lower, upper, radius, centerx, closeball, firstdetection ): 
         self.color = color
         self.lower = lower 
         self.upper = upper 
         self.detected = False
         self.radius = 0.0 
         self.centerx = 0 
-        self.centery = 0 
+        self.closeball = 0 
+        self.firstdetection = 0 
 
 ## initialization of balls 
-balls = [   Ball('green',(50, 50, 20),(70, 255, 255), 0.0, 0, 0),
-            Ball('yellow',(25, 50, 20),(32, 255, 255), 0.0, 0, 0),
-            Ball('red',(0, 50, 100),(12, 255, 255), 0.0, 0, 0),
-            Ball('blue',(105, 50, 20),(135, 255, 255), 0.0, 0, 0),
-            Ball('pink',(143, 50, 20),(160, 255, 255), 0.0, 0, 0),
-            Ball('black',(0, 0, 0),(179, 255, 10), 0.0, 0, 0)]      
+balls = [   Ball('green',(50, 50, 20),(70, 255, 255), 0.0, 0, 0, 0),
+            Ball('yellow',(25, 50, 20),(32, 255, 255), 0.0, 0, 0, 0),
+            Ball('red',(0, 50, 100),(12, 255, 255), 0.0, 0, 0, 0),
+            Ball('blue',(105, 50, 20),(135, 255, 255), 0.0, 0, 0, 0),
+            Ball('magenta',(143, 50, 20),(160, 255, 255), 0.0, 0, 0, 0),
+            Ball('black',(0, 0, 0),(179, 255, 10), 0.0, 0, 0, 0)]      
 
 class image_feature: 
     def __init__(self): 
         self.image_pub = rospy.Publisher("/output/image_raw/compressed", 
                                             CompressedImage, queue_size=1) 
-                # Subscribed Topic
+
+        self.infosBall_pub = rospy.Publisher("/InfoBalls", BallInfoMsg, queue_size=1) 
+
+        # Subscribed Topic
         self.subscriber = rospy.Subscriber(
             "/camera1/image_raw/compressed", CompressedImage, self.Det_Ball_clbk,  queue_size=1)
 
-        self.infosBall_pub = rospy.Publisher("InfoBalls", BallInfoMsg, queue_size=1) 
+
+
         
     def Det_Ball_clbk(self, ros_data): 
 
@@ -94,60 +102,68 @@ class image_feature:
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
                 ## only proceed if the radius meets a minimum size
-                if radius > 5: 
+                if radius > 10 and radius < 50: 
                     cv2.circle(image_np, (int(x), int(y)), int(radius),
                                     (0, 255, 255), 2)
                     cv2.circle(image_np, center, 5, (0, 0, 255), -1)
                     
-                    ## if the ball has not detected so far
-                    if ball.detected == False: 
-                        ball.detected = True
-                        rospy.set_param('ColorBallDetected', ball.color)
+                    ## if the ball is known already 
+                    if ball.detected == True: 
+                        ball.firstdetection = 0
                         ball.radius = radius 
                         ball.centerx = center[0]
-                        ball.centery = center[1]
+                        ball.closeball = -1 
+                    else: 
+                        ball.detected = True
+                        ball.radius = radius 
+                        ball.centerx = center[0] 
+                        ball.closeball = -1 
+                        ball.firstdetection = 1
 
-            if ball.detected == True:            
+
+                elif radius >= 50: 
+                    if ball.detected == True: 
+                        ball.firstdetection = 0
+                        ball.radius = radius 
+                        ball.centerx = center[0]
+                        ball.closeball = 1
+                    else: 
+                        ball.detected = True
+                        ball.radius = radius
+                        ball.closeball = 1 
+                        ball.firstdetection = 1
+
+                else: 
+                    ball.detected = False 
+                    ball.radius = 0 
+                    ball.centerx = 0 
+                    ball.closeball = 0 
+                    ball.firstdetection = 0 
+
+
+
                 message = BallInfoMsg() 
                 message.detected = Bool(ball.detected)
                 message.color = String(ball.color) 
                 message.radius = Float64(ball.radius)
                 message.centerx = Float64(ball.centerx)
-                message.centery = Float64(ball.centery)
-                r = rospy.Rate(5) 
+                message.closeball = Float64(ball.closeball)
+                message.firstdetection = Float64(ball.firstdetection)
                 self.infosBall_pub.publish(message)
 
-                        
 
             cv2.imshow('window', image_np) 
             cv2.waitKey(2) 
-
 def main(): 
-    rospy.init_node('camera_processing') 
-    rospy.set_param('ColorBallDetected', 0)
+    rospy.init_node('camera_processing', anonymous = True) 
+
 
 
     
-    ic = image_feature() 
+    image_feature() 
     rospy.spin() 
+    pass
 
-    """
-        for index, ball in enumerate(balls): 
-            if (ball.detected == True) & (ball.color == rospy.get_param('ColorBallDetected')): 
-                break
-            else:
-                index = -1 
-
-        message = BallInfoMsg() 
-        message.detected = Bool(balls[index].detected)
-        message.color = String(balls[index].color)
-        message.radius = Float64(balls[index].radius)
-        message.centerx = Float64(balls[index].centerx)
-        message.centery = Float64(balls[index].centery)
-        infosBall_pub.publish(message)
-        r = rospy.Rate(1) 
-        rospy.spin() 
-"""
 
 if __name__ == '__main__': 
     main() 
