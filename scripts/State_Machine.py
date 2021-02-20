@@ -46,12 +46,14 @@ from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 # msg 
 from exp_assignment3.msg import BallInfoMsg
 
+## library for running explore package 
 import matplotlib.pyplot as plt
 import signal 
 import subprocess 
 import roslaunch
 
 
+## Global variables 
 global rooms
 global play 
 global sleep
@@ -60,7 +62,7 @@ global Target
 
 
 
-## Callback for InfoBall 
+## Initialization and Callback for InfoBall 
 InfoBall = BallInfoMsg() 
 InfoBall.detected = False 
 InfoBall.radius = 0 
@@ -77,16 +79,17 @@ def clbk_ball(info):
     InfoBall.closeball = info.closeball.data
     InfoBall.firstdetection = info.firstdetection.data
 
+
 ## Callback for the command
 usercommand = String() 
 def clbk_command(data): 
     usercommand = data.data
 
-## Callback for the position
+
+## Callback for the odometry 
 position = Point() 
 yaw = 0 
 
-## callback for odometry 
 def clbk_odometry(msg): 
     global position 
     position = msg.pose.pose.position
@@ -122,16 +125,37 @@ def move_dog(target):
 
    # Sends the goal to the action server.
     client.send_goal(goal)
-
-    # cancel goal 
+   
+    """     # cancel action when a new ball is detected 
     while True: 
         if InfoBall.firstdetection == 1:  
             return client.cancel_goal()
+"""
+
+    while True: 
+
+        if math.fabs(position.x - target[0]) < 0.1 or math.fabs(position.y - target[1]) < 0.1:
+            time.sleep(3) 
+            rospy.loginfo('Goal reached!!')
+            return client.cancel_all_goals() 
+             
+
+        if InfoBall.firstdetection == 1: 
+            return client.cancel_all_goals() 
 
 
-   # Waits for the server to finish performing the action.
+
+    """
+    while abs(position.x - target[0]) > 0.3 or abs(position.y - target[1]) > 0.3: 
+        time.sleep(1) 
+    loginfo('ok') 
+    client.cancel_all_goals() 
+    return 1
+    """
+       # Waits for the server to finish performing the action.
     wait = client.wait_for_result()
-   # If the result doesn't arrive, assume the Server is not available
+
+       # If the result doesn't arrive, assume the Server is not available
     if not wait:
         rospy.logerr("Action server not available!")
         rospy.signal_shutdown("Action server not available!")
@@ -140,8 +164,25 @@ def move_dog(target):
         return client.get_result()  
 
 
+    
 
-## class for information about rooms 
+
+
+
+"""
+   # cancel the action when the target is achieved 
+    while abs(position.x - target[0]) > 0.3 or abs(position.y - target[1])> 0.3:
+        time.sleep(1) 
+     
+    rospy.loginfo('Target reached!')
+    client.cancel_all_goals() 
+    return -1 
+"""
+
+
+
+
+## class for storing informations about rooms 
 class Room: 
     def __init__(self, name, color, x, y): 
         self.name = name #name of the room
@@ -178,29 +219,20 @@ class Normal(smach.State):
 
     ## execution 
     def execute(self, userdata):
-
-        ## Check if the ball has been detected before
-        for index, room in enumerate(rooms): 
-            if room.color == InfoBall.color: 
-                rospy.loginfo('%x', index)
-                break
-        
-
         while True: 
             self.counter = self.counter + 1
-                
-            #Normal = move_dog([random.randrange(-6,6), random.randrange(-6,3)])
-            #if Normal: 
-            #    rospy.loginfo('Goal achieved!')
+            ## Random motion implementing a move_base action with a random goal   
+            #Normal = move_dog([random.randrange(-5,6), random.randrange(-5,3)])
             
-
+            ## if camera detects a new ball which has not been detected before 
             if InfoBall.firstdetection == 1: 
-                rospy.loginfo('the ball has not been detected before!')
+                rospy.loginfo('the %s ball has not been detected before!', InfoBall.color)
                 return 'track_ball'
                 
-
-            if self.counter == 5:
+            ## after 3 random goal achieved it can switch in sleep or play behavior (randomly choosen)
+            if self.counter == 2:
                 self.counter = 0
+                ## call the function to randomly choose the next behavior
                 self.userAction = user_action() 
                 rospy.loginfo('the user action is %s', self.userAction)
                 if self.userAction == "play": 
@@ -212,10 +244,11 @@ class Normal(smach.State):
                     return 'go_to_play' 
 
                 if self.userAction == "sleep": 
+                    rospy.loginfo('it is time to sleep')
                     return 'go_to_sleep'
 
 
-
+## publisher velocity
 vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
 vel = Twist()
 vel.linear.x = 0 
@@ -235,11 +268,10 @@ class Normal_Track(smach.State):
 
     ## execution 
     def execute(self, userdata):
+        rospy.loginfo('lets reach the ball')
 
-        rospy.loginfo('lets follow the ball')
-
+        ## if the ball is far away, set the velocity
         while InfoBall.closeball == -1: 
-            #rospy.loginfo('ball is far')
             vel.angular.z = -0.002 * (InfoBall.centerx - 400) 
             vel.linear.x = -0.01 * (InfoBall.radius - 100) 
             vel_pub.publish(vel) 
@@ -248,7 +280,8 @@ class Normal_Track(smach.State):
         vel.angular.z = 0 
         vel_pub.publish(vel)
 
-
+        ## store the position 
+        ## check the index of our room list according to the color of the detected ball to fill the position as well
         for index, room in enumerate(rooms): 
             if room.color == InfoBall.color: 
                 rospy.loginfo('%x', index)
@@ -291,7 +324,6 @@ class Play(smach.State):
 
     ##execution 
     def execute(self, userdata): 
-
         rospy.loginfo('my target is %s', rospy.get_param('Target'))
 
         ## check the index of the list of the room which corresponds to our target
@@ -299,18 +331,17 @@ class Play(smach.State):
             if room.name == rospy.get_param('Target'): 
                 break
 
-
+        ## check if the target room has been visited yet: if not the default position is true->then switch to find
         if (rooms[index_].x == 0) & (rooms[index_].y == 0): 
             rospy.loginfo('The room %s has not been discovered yet, lets find it', rooms[index_].name)   
             rospy.set_param('Finding',1) 
             return 'play_to_find'  
+        ## otherwise, reach the target using move_base 
         else: 
             rospy.loginfo('I know where is %s, lets go there!', rooms[index_].name)
             play = move_dog([rooms[index_].x, rooms[index_].y])  
-            if play: 
-                rospy.loginfo('Achieved Target!')
-
-                return 'play_to_normal'
+            gohome = move_dog([-5,8]) 
+            return 'play_to_normal'
 
 ## Find State
 class Find(smach.State): 
