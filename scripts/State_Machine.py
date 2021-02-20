@@ -59,7 +59,7 @@ global play
 global sleep
 global Finding
 global Target 
-
+global counter 
 
 
 ## Initialization and Callback for InfoBall 
@@ -134,7 +134,7 @@ def move_dog(target):
 
     while True: 
 
-        if math.fabs(position.x - target[0]) < 0.1 or math.fabs(position.y - target[1]) < 0.1:
+        if math.fabs(position.x - target[0]) < 0.3 or math.fabs(position.y - target[1]) < 0.3:
             time.sleep(3) 
             rospy.loginfo('Goal reached!!')
             return client.cancel_all_goals() 
@@ -214,15 +214,17 @@ class Normal(smach.State):
     def __init__(self):
         ## 3 outcomes defined 
         smach.State.__init__(self, outcomes=['go_to_sleep','go_to_play','track_ball'])
-        self.counter = 0 
+
         self.userAction = String() 
 
     ## execution 
     def execute(self, userdata):
         while True: 
-            self.counter = self.counter + 1
+            counter = rospy.get_param('counter')
+            counter = counter + 1 
+            rospy.set_param('counter', counter)
             ## Random motion implementing a move_base action with a random goal   
-            #Normal = move_dog([random.randrange(-5,6), random.randrange(-5,3)])
+            Normal = move_dog([random.randrange(-5,6), random.randrange(-5,3)])
             
             ## if camera detects a new ball which has not been detected before 
             if InfoBall.firstdetection == 1: 
@@ -230,8 +232,8 @@ class Normal(smach.State):
                 return 'track_ball'
                 
             ## after 3 random goal achieved it can switch in sleep or play behavior (randomly choosen)
-            if self.counter == 2:
-                self.counter = 0
+            if rospy.get_param('counter') == 3:
+                rospy.set_param('counter', 0)
                 ## call the function to randomly choose the next behavior
                 self.userAction = user_action() 
                 rospy.loginfo('the user action is %s', self.userAction)
@@ -269,7 +271,7 @@ class Normal_Track(smach.State):
     ## execution 
     def execute(self, userdata):
         rospy.loginfo('lets reach the ball')
-
+        time.sleep(5) 
         ## if the ball is far away, set the velocity
         while InfoBall.closeball == -1: 
             vel.angular.z = -0.002 * (InfoBall.centerx - 400) 
@@ -424,7 +426,7 @@ def main():
     rospy.Subscriber("/odom", Odometry, clbk_odometry)
     rospy.Subscriber("/UserCommand", String, clbk_command)
     rospy.set_param('Finding',0) 
-
+    rospy.set_param('counter', 0) 
 
 
     
