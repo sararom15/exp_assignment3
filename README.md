@@ -88,7 +88,7 @@ The parameter is needed because the exploration must be done yet.
 4. FIND_CONTAINER:
    - FIND: here, if the parameter “Finding” is 1, the explore-lite package is launched in order to explore the unknown environment. When a new 	ball is detected, it switches in the sub-state find_track. 
 
-   - FIND_TRACK: the robot behaves as well as in the Normal_Track. Once the new position has been stored, the parameter “Finding” is set 	to 0, which means that the exploration has been done and a ball has been found.
+   - FIND_TRACK: the robot behaves as well as in the Normal_Track. Once the new position has been stored, the parameter “Finding” is set to 0, which means that the exploration has been done and a ball has been found.
 
 It returns in FIND state, which returns to PLAY, since the parameter “Finding” is 0. 
 
@@ -115,7 +115,15 @@ More about explore-lite [here](http://wiki.ros.org/explore_lite).
 
 ## ROS Parameters and messages
 ### ROS Parameters 
-
+The following ROS parameters are defined: 
+- "/home_x" : x position of the home, used in Sleep state. 
+- "/home_y" : y position of the home, used in Sleep state. 
+- "/human_x" : x position of the human, used in Play state. 
+- "/human_y" : y position of the human, used in Play state. 
+- "/timesleeping" : the time the robot stays in the home in the Sleep state. 
+- "Finding" : global parameter used in State_Machine.py node. It can be set to 0 or 1. For default it is 0, when the state play is actived and the target is an unknown room, the parameter is set to 1, which means that the robot must start the exploration. It is re-set to 0 when the exploration is ended. 
+- "Counter" : global parameter use in State_Machine.py node. It can go from 0 to 3 and counts the num of time in which the robot can move randomly; after that it can switch in Sleep or Play state. 
+ 
 ### ROS messages
 The following ROS message is defined: 
 - InfoBallMsg.msg: it contains the informations of the ball which has been detected.
@@ -128,11 +136,10 @@ std_msgs/Float64 radius
 std_msgs/Float64 centerx 
 std_msgs/Float64 closeball
 std_msgs/Float64 firstdetection
-
 ```
 
 
-##The robot 
+## The robot 
 Since no robot is given in the initial simulation, few words about it need to be spent. 
 Although the structure remains similar to the one in the previous assignment, with some modifications: we have a differential drive robot, with two wheels;  a neck (fixed with the link chassis); a head, which is fixed on the neck in this case: so the revolute joint has been replaced by a fixed joint; a RGB camera, fixed on the head; in addition a hokuyo laser scan has been fixed on the link chassis (needed for slam_mapping). 
 Here the URDF graph is showed. 
@@ -141,5 +148,74 @@ Here the URDF graph is showed.
 <img src="https://github.com/sararom15/exp_assignment3/blob/main/images/RobotURDF.png">
 </p>
 
+# Package and file list 
+There exist some folders in the package: 
+
+- package.xml and the CMakeList.txt; 
+
+- config folder: contains the sim.rviz. 
+
+- msg folder: contains the msg “BallInfoMsg.msg” created to share balls infos between the nodes. 
+
+- param folder: contains all the parameters needed for the MoveBase. We can find five files: base_local_planner_params.yaml, costmap_common_params.yaml, global_costmap_params.yaml, local_costmap_params.yaml, move_base_param.yaml. 
+
+- images folder: contains the images used in this README. 
+
+- scripts folder: contains the 3 nodes self written, already discussed above. 
+
+- urdf folder: contains the xacro, urdf, and gazebo files of the robot, the ball and the human. 
+
+- worlds folder: contains the house2.world. 
+
+- launch folder: contains the 3 launch files which are the gmapping.launch, the move_base.launch and the simulation.launch.
+
+Take into account that the explore-lite package must be properly cloned in the workspace. 
+
+# Installation and running procedure
+Before to proceed with the installation of this package, check that all the other involved packages are properly installed. I am referring to OpenCV, Gmapping and Navigation Stack for the move_base. 
+After that, it is possible to proceed with the installation. 
+
+First of all, clone the repository in your workspace. 
+
+Then, build the project from the workspace, in order that all message files are created.
+
+```
+ cd “yourworkspace”_ws 
+    catkin_make
+```
+
+Source the files: 
+
+```
+source "yourworkspace"_ws/devel/setup.bash
+```
+
+Launch the launch file:
+
+```
+roslaunch exp_assignment3 simulation.launch 
+```
+
+# Systems features 
+
+- Image feature and detection of many balls with different color; 
+- autonomous navigation; 
+- creation of a map: laser-based SLAM (simultaneously localization and mapping); 
+- global and local path planning (creating a costmap), path following, avoidance obstacle in indoor environment; 
+- exploration of unknown environment; 
+
+# Limitations 
+
+Since in the track states we are interesting in following the ball modifying the velocity according to the distance to the ball, we let the ball move going to subscribe the velocity in the “cmd_vel” topic. This is for sure a limitation of the project because if the robot encounters an obstacle in his path, he can not avoid it even though the balls are well isolated from each other. 
+For instance, this could occurs when the robot exits from the bedroom: he can detect the red ball and the green ball, which are separated by a wall. If the detection happens before on the red ball, the robot slams into the well and there is no way to get him back on his path. 
+In addition we can not handle the problem shifting the robot using Gazebo tools, because it triggers an error in the odometry. 
+Another limitation is linked to the usage of only move_base client. For instance, when the robot reached the goal, the server did not recognise that it had completed the action. 
+To solve this issue, a control in loop is done: if the difference between the position by the odometry and the target is lower than a certain value (0.3) then the goal is cancelled. 
+
+# Author and contact 
+
+Sara Romano - S4802844
+
+sara.romano.15@gmail.com 
 
 

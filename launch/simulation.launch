@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 	
-	  <!-- these are the arguments you can pass this launch file, for example paused:=true -->
+  <!-- these are the arguments you can pass this launch file, for example paused:=true -->
   <arg name="paused" default="false"/>
   <arg name="use_sim_time" default="true"/>
   <arg name="extra_gazebo_args" default=""/>
@@ -29,6 +29,17 @@
   <arg     if="$(arg verbose)" name="command_arg3" value="--verbose"/>
   <arg unless="$(arg debug)" name="script_type" value="gzserver"/>
   <arg     if="$(arg debug)" name="script_type" value="debug"/>
+
+  <!-- set parameter for home position --> 
+  <param name="home_x" value= "-5" /> 
+  <param name="home_y" value= "6" /> 
+
+  <!-- set parameter for human position --> 
+  <param name="human_x" value="-5" /> 
+  <param name="human_y" value="7.5" /> 
+
+  <!-- set parameter for time sleeping --> 
+  <param name="timesleeping" value="20" /> 
 
   <!-- start gazebo server-->
   <group if="$(arg use_clock_frequency)">
@@ -67,6 +78,12 @@
   <!--Launch Move Base package--> 
   <include file="$(find planning)/launch/move_base.launch"></include>
 
-
+  <!--Launch the camera processing node --> 
+  <node name= "camera_processing" pkg="exp_assignment3" type="camera_processing.py" output="screen" /> 
+  </node> 
+    <node name= "Commander" pkg="exp_assignment3" type="Commander.py" output="screen" /> 
+  </node> 
+  <node name= "state_machine" pkg="exp_assignment3" type="State_Machine.py" output="screen" /> 
+  </node> 
 
 </launch>

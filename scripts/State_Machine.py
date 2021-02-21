@@ -134,7 +134,7 @@ def move_dog(target):
 
     while True: 
 
-        if math.fabs(position.x - target[0]) < 0.3 or math.fabs(position.y - target[1]) < 0.3:
+        if math.fabs(position.x - target[0]) < 0.1 or math.fabs(position.y - target[1]) < 0.1:
             time.sleep(3) 
             rospy.loginfo('Goal reached!!')
             return client.cancel_all_goals() 
@@ -162,23 +162,6 @@ def move_dog(target):
     else:
     # Result of executing the action
         return client.get_result()  
-
-
-    
-
-
-
-
-"""
-   # cancel the action when the target is achieved 
-    while abs(position.x - target[0]) > 0.3 or abs(position.y - target[1])> 0.3:
-        time.sleep(1) 
-     
-    rospy.loginfo('Target reached!')
-    client.cancel_all_goals() 
-    return -1 
-"""
-
 
 
 
@@ -225,7 +208,7 @@ class Normal(smach.State):
             rospy.set_param('counter', counter)
             ## Random motion implementing a move_base action with a random goal   
             Normal = move_dog([random.randrange(-5,6), random.randrange(-5,3)])
-            
+
             ## if camera detects a new ball which has not been detected before 
             if InfoBall.firstdetection == 1: 
                 rospy.loginfo('the %s ball has not been detected before!', InfoBall.color)
@@ -310,9 +293,9 @@ class Sleep(smach.State):
     ##execution 
     def execute(self, userdata): 
         rospy.loginfo('Go to sleep')
-        move_dog([-5,8])
+        Sleep = move_dog([rospy.get_param("/home_x"), rospy.get_param("/home_y")])
         ## sleep for a while
-        time.sleep(14) 
+        time.sleep(rospy.get_param("/timesleeping")
         return 'sleep_to_normal'
 
 
@@ -341,8 +324,8 @@ class Play(smach.State):
         ## otherwise, reach the target using move_base 
         else: 
             rospy.loginfo('I know where is %s, lets go there!', rooms[index_].name)
-            play = move_dog([rooms[index_].x, rooms[index_].y])  
-            gohome = move_dog([-5,8]) 
+            Play = move_dog([rooms[index_].x, rooms[index_].y])  
+            Gohome = move_dog([rospy.get_param("/human_x"), rospy.get_param("/human_y")]) 
             return 'play_to_normal'
 
 ## Find State
