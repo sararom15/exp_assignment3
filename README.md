@@ -1,5 +1,5 @@
 # Assignment 3 - Experimental Robotics Laboratory 
-#Introduction 
+# Introduction 
 The ROS package simulates a dog robot which can move in an environment divided into 6 rooms, each room is associated to a different color ball: 
 
 - Blue : Entrance 
@@ -9,7 +9,7 @@ The ROS package simulates a dog robot which can move in an environment divided i
 - Orange: Bathroom 
 - Black: Bedroom 
 
-The simulation is emulated in Gazebo and visualized in Rviz with a custom-built world. 
+The simulation is carried out in Gazebo and visualized in Rviz with a custom-built world. 
 The robot is a differential drive robot with two wheels; also it has a camera RGB (to detect the balls) and a hokuyo laser (for the obstacle avoidance): it has been modeled with URDF. 
 
 The possible behaviors of the robot are: normal, sleep, play, find: they are implemented using a finite state machine architecture (using SMACH). 
@@ -116,18 +116,21 @@ More about explore-lite [here](http://wiki.ros.org/explore_lite).
 ## ROS Parameters and messages
 ### ROS Parameters 
 
-### ROS message 
+### ROS messages
 The following ROS message is defined: 
 - InfoBallMsg.msg: it contains the informations of the ball which has been detected.
-The structure is the following: 
-''' 
+The structure is: 
+
+```
 std_msgs/Bool detected
 std_msgs/String color 
 std_msgs/Float64 radius 
 std_msgs/Float64 centerx 
 std_msgs/Float64 closeball
 std_msgs/Float64 firstdetection
-''' 
+
+```
+
 
 ##The robot 
 Since no robot is given in the initial simulation, few words about it need to be spent. 
