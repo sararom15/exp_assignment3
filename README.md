@@ -96,7 +96,7 @@ If the found ball coincides with the target, everything is fine. Otherwise the p
 
 
 
-##Additional nodes used 
+## Additional nodes used 
 ### slam_gmapping
 The node is contained in the Gmapping package, which must be launched before the simulation. It provides laser-based SLAM (Simultaneous Localization and Mapping): it creates a 2D occupancy grid map from lased and pose data collected by a mobile robot. 
 In order to make a map, a robot with a laser scan and the odometry data are needed. 
