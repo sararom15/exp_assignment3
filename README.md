@@ -169,10 +169,11 @@ There exist some folders in the package:
 
 - launch folder: contains the 3 launch files which are the gmapping.launch, the move_base.launch and the simulation.launch.
 
-Take into account that the explore-lite package must be properly cloned in the workspace. 
 
 # Installation and running procedure
 Before to proceed with the installation of this package, check that all the other involved packages are properly installed. I am referring to OpenCV, Gmapping and Navigation Stack for the move_base. 
+Take into account that the explore-lite package must be properly cloned in the workspace. 
+It is possible to clone the m-explore repository [here](https://github.com/CarmineD8/m-explore)
 After that, it is possible to proceed with the installation. 
 
 First of all, clone the repository in your workspace. 

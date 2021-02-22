@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 ## @file state_machine.py 
-# @brief This node implements a state machine which permits to move around and to search for a ball, go to sleep, and play with the ball when the last one is found. 
+# @brief This node implements a state machine which permits to move around, detect the ball (if visible), go to sleep, play with the human going to a target defined by a colored ball if he knows the room location. If not, he can find it exploring the environment. 
 # 
 
 
@@ -43,7 +43,7 @@ import actionlib.msg
 # Brings in the .action file and messages used by the move base action
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 
-# msg 
+# msg used for ball infos 
 from exp_assignment3.msg import BallInfoMsg
 
 ## library for running explore package 
@@ -125,37 +125,23 @@ def move_dog(target):
 
    # Sends the goal to the action server.
     client.send_goal(goal)
-   
-    """     # cancel action when a new ball is detected 
-    while True: 
-        if InfoBall.firstdetection == 1:  
-            return client.cancel_goal()
-"""
 
+    ## in loop 
     while True: 
-
+        ## if the goal is reached, then cancel the goal 
         if math.fabs(position.x - target[0]) < 0.1 or math.fabs(position.y - target[1]) < 0.1:
             time.sleep(3) 
             rospy.loginfo('Goal reached!!')
             return client.cancel_all_goals() 
              
-
+        ## if a new ball is detected, then cancel the goal 
         if InfoBall.firstdetection == 1: 
             return client.cancel_all_goals() 
 
-
-
-    """
-    while abs(position.x - target[0]) > 0.3 or abs(position.y - target[1]) > 0.3: 
-        time.sleep(1) 
-    loginfo('ok') 
-    client.cancel_all_goals() 
-    return 1
-    """
-       # Waits for the server to finish performing the action.
+    # Waits for the server to finish performing the action.
     wait = client.wait_for_result()
 
-       # If the result doesn't arrive, assume the Server is not available
+    # If the result doesn't arrive, assume the Server is not available
     if not wait:
         rospy.logerr("Action server not available!")
         rospy.signal_shutdown("Action server not available!")
@@ -197,12 +183,13 @@ class Normal(smach.State):
     def __init__(self):
         ## 3 outcomes defined 
         smach.State.__init__(self, outcomes=['go_to_sleep','go_to_play','track_ball'])
-
         self.userAction = String() 
 
     ## execution 
     def execute(self, userdata):
+        ## in loop 
         while True: 
+            ## couter 
             counter = rospy.get_param('counter')
             counter = counter + 1 
             rospy.set_param('counter', counter)
@@ -220,20 +207,22 @@ class Normal(smach.State):
                 ## call the function to randomly choose the next behavior
                 self.userAction = user_action() 
                 rospy.loginfo('the user action is %s', self.userAction)
+                ## if play behavior is chosen 
                 if self.userAction == "play": 
                     command = rospy.wait_for_message("UserCommand", String) 
                     rospy.loginfo('it is Time to play: %s', command.data)
+                    ## look at the target 
                     res = command.data.split() 
                     rospy.set_param('Target', res[1])
                     rospy.loginfo('%s', res[1]) 
                     return 'go_to_play' 
-
+                ## if the sleep behavoir is chosen 
                 if self.userAction == "sleep": 
                     rospy.loginfo('it is time to sleep')
                     return 'go_to_sleep'
 
 
-## publisher velocity
+## call publisher velocity
 vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
 vel = Twist()
 vel.linear.x = 0 
@@ -248,12 +237,13 @@ class Normal_Track(smach.State):
 
     ## inizialization
     def __init__(self):
+        ## one outcome defined 
         smach.State.__init__(self, outcomes=['done']) 
 
 
     ## execution 
     def execute(self, userdata):
-        rospy.loginfo('lets reach the ball')
+        rospy.loginfo('reach the ball')
         time.sleep(5) 
         ## if the ball is far away, set the velocity
         while InfoBall.closeball == -1: 
@@ -265,13 +255,12 @@ class Normal_Track(smach.State):
         vel.angular.z = 0 
         vel_pub.publish(vel)
 
-        ## store the position 
         ## check the index of our room list according to the color of the detected ball to fill the position as well
         for index, room in enumerate(rooms): 
             if room.color == InfoBall.color: 
                 rospy.loginfo('%x', index)
                 break
-
+        ## store the position 
         rospy.loginfo('Ball reached. Lets store the position')
         rooms[index].x = position.x 
         rooms[index].y = position.y 
@@ -293,9 +282,10 @@ class Sleep(smach.State):
     ##execution 
     def execute(self, userdata): 
         rospy.loginfo('Go to sleep')
+        ## call move_base to move to the home position 
         Sleep = move_dog([rospy.get_param("/home_x"), rospy.get_param("/home_y")])
         ## sleep for a while
-        time.sleep(rospy.get_param("/timesleeping")
+        time.sleep(rospy.get_param("/timesleeping"))
         return 'sleep_to_normal'
 
 
@@ -304,6 +294,7 @@ class Play(smach.State):
 
     ## inizialization
     def __init__(self):
+        ## two otcomes defined 
         smach.State.__init__(self, outcomes=['play_to_normal', 'play_to_find'])
 
 
@@ -316,15 +307,18 @@ class Play(smach.State):
             if room.name == rospy.get_param('Target'): 
                 break
 
-        ## check if the target room has been visited yet: if not the default position is true->then switch to find
+        ## check if the target room has been visited already: if not the default position is true->then switch to find
         if (rooms[index_].x == 0) & (rooms[index_].y == 0): 
-            rospy.loginfo('The room %s has not been discovered yet, lets find it', rooms[index_].name)   
+            rospy.loginfo('The room %s has not been discovered yet, lets find it', rooms[index_].name)  
+            ## set param 'Finding' to 1 to start the search of the ball  
             rospy.set_param('Finding',1) 
             return 'play_to_find'  
-        ## otherwise, reach the target using move_base 
+        ## otherwise, reach the target 
         else: 
             rospy.loginfo('I know where is %s, lets go there!', rooms[index_].name)
-            Play = move_dog([rooms[index_].x, rooms[index_].y])  
+            ## call move_base to reach the target 
+            Play = move_dog([rooms[index_].x, rooms[index_].y])
+            ## call move_base to reach the human position   
             Gohome = move_dog([rospy.get_param("/human_x"), rospy.get_param("/human_y")]) 
             return 'play_to_normal'
 
@@ -333,17 +327,18 @@ class Find(smach.State):
 
     ## inizialization
     def __init__(self):
+        ## two otcomes defined
         smach.State.__init__(self, outcomes=['go_to_play', 'track_place'])
 
 
     ##execution 
     def execute(self, userdata): 
-
+        ## if 'finding' param is set to 1 -> start the exploration 
         if rospy.get_param('Finding') == 1: 
 
             ## launch explore package 
             p = subprocess.Popen(["roslaunch","exp_assignment3","explore.launch"])
-
+            ## in loop 
             while True: 
                 ## if a ball has been detected
                 if InfoBall.firstdetection == 1: 
@@ -354,7 +349,7 @@ class Find(smach.State):
                         vel_pub.publish(vel)
                     #time.sleep(7)
                     return 'track_place'
-
+        ## if the exploration is done, return in play state 
         if rospy.get_param('Finding') == 0: 
             return 'go_to_play'
         
@@ -365,16 +360,14 @@ class Find(smach.State):
 class Find_Track(smach.State): 
     ## inizialization
     def __init__(self):
-
         smach.State.__init__(self, outcomes=['found'])
 
     ##execution 
     def execute(self, userdata): 
-        
-
+        ## the ball has been found, then set 'finding' = 0 
         rospy.set_param('Finding',0)
         rospy.loginfo('The %s ball has been detected!', InfoBall.color)
-        
+        ## follow the ball in case it is faar away 
         while InfoBall.closeball == -1: 
             #rospy.loginfo('ball is far')
             vel.angular.z = -0.002 * (InfoBall.centerx - 400) 
@@ -385,25 +378,23 @@ class Find_Track(smach.State):
         vel.angular.z = 0 
         vel_pub.publish(vel)
 
-
+        ## check the index of our room list according to the color of the detected ball to fill the position as well
         for index, room in enumerate(rooms): 
             if room.color == InfoBall.color: 
                 rospy.loginfo('%x', index)
                 break
-
+        ## store position 
         rospy.loginfo('Ball reached. Lets store the position')
         rooms[index].x = position.x 
         rooms[index].y = position.y 
         rospy.loginfo('I am in x = %x, y = %s , in the %s', rooms[index].x, rooms[index].y, rooms[index].name)
-
         time.sleep(4) 
 
         return 'found'
 
 
-
+## main function 
 def main(): 
-
     rospy.init_node('state_machine')
     rospy.Subscriber("/InfoBalls", BallInfoMsg, clbk_ball)
     rospy.Subscriber("/odom", Odometry, clbk_odometry)
@@ -415,18 +406,19 @@ def main():
     
 
     ## Create a main SMACH state machine
-
     sm_main = smach.StateMachine(outcomes=[])
 
+    ## main container
     with sm_main:
         ## Add states to the container
 
-        ## NCreate NORMAL sub-state machine 
+        ## Create NORMAL sub-state machine 
         sm_normal = smach.StateMachine(outcomes=['normal_to_play', 'normal_to_sleep'])
 
+        ## Normal container
         with sm_normal: 
 
-            ## Add state to the NORMAL sub container 
+            ## Add states to the NORMAL sub container 
             smach.StateMachine.add('NORMAL', Normal(),
                                 transitions={'go_to_sleep':'normal_to_sleep',
                                               'go_to_play':'normal_to_play',
@@ -448,10 +440,10 @@ def main():
 
         ## Create FIND sub-state machine
         sm_find = smach.StateMachine(outcomes=['find_to_play'])
-
+        ## Find container 
         with sm_find: 
 
-            ## Add state to the FIND sub container
+            ## Add states to the FIND sub container
             smach.StateMachine.add('FIND', Find(),
                                     transitions={'go_to_play':'find_to_play', 
                                                  'track_place':'FIND_TRACK'})
