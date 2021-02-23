@@ -122,6 +122,7 @@ The following ROS parameters are defined:
 - "/human_y" : y position of the human, used in Play state. 
 - "/timesleeping" : the time the robot stays in the home in the Sleep state. 
 - "Finding" : global parameter used in State_Machine.py node. It can be set to 0 or 1. For default it is 0, when the state play is actived and the target is an unknown room, the parameter is set to 1, which means that the robot must start the exploration. It is re-set to 0 when the exploration is ended. 
+- "/StopAction": global parameter used in State_Machine.py node. It can be set to 0 or 1. For default it is 0: when the state is normal it is set to 1 in order to cancel the goal of the move_base action only if the robot is in normal behavior. Otherwise, in sleep and play, it is set to 0 in order to not cancel the goal even if the robot is going in home/human position and detects a new ball. 
 - "Counter" : global parameter use in State_Machine.py node. It can go from 0 to 2 and counts the num of time in which the robot can move randomly; after that it can switch in Sleep or Play state. 
  
 ### ROS messages
@@ -217,7 +218,7 @@ rosrun exp_assignment3 State_Machine.py
 
 Since in the track states we are interesting in following the ball modifying the velocity according to the distance to the ball, we let the ball move going to subscribe the velocity in the “cmd_vel” topic. This is for sure a limitation of the project because if the robot encounters an obstacle in his path, he can not avoid it, even though the balls are well isolated from each other. 
 For instance, this could occurs when the robot exits from the bedroom: he can detect the red ball and the green ball, which are separated by a wall. If the detection happens before on the red ball, the robot slams into the well and there is no way to get him back on his path. 
-In addition, when the robot switches in Sleep state, since the camera is always activated, while the robot is reaching the home position and encunters a new ball, the goal is immediately cancelled. This means that the robot does not reach the home position anymore. This can happen in the Play State, when the robot is achieving the human position as well. 
+In addition, sometimes, when the robot is in Normal state and detectes the ball, happens that he does not follow the ball, but stores its position without being close to the ball. 
 Another limitation is linked to the usage of only move_base client. For instance, when the robot reached the goal, the server did not recognise that it had completed the action. 
 To solve this issue, a control in loop is done: if the difference between the position by the odometry and the target is lower than a certain value (0.3) then the goal is cancelled. 
 

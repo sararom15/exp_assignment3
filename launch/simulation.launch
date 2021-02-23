@@ -79,11 +79,12 @@
   <include file="$(find planning)/launch/move_base.launch"></include>
 
   <!--Launch the camera processing node --> 
+
   <node name= "camera_processing" pkg="exp_assignment3" type="camera_processing.py" output="screen" /> 
-  </node> 
+
     <node name= "Commander" pkg="exp_assignment3" type="Commander.py" output="screen" /> 
-  </node> 
-  <node name= "state_machine" pkg="exp_assignment3" type="State_Machine.py" output="screen" /> 
-  </node> 
+  
+ <!-- <node name= "state_machine" pkg="exp_assignment3" type="State_Machine.py" output="screen" /> -->
+
 
 </launch>

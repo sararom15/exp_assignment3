@@ -104,7 +104,7 @@ class image_feature:
                 center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
 
                 ## if the radius meets a minimum size the ball is not close to the robot
-                if radius > 5 and radius < 50: 
+                if radius > 20 and radius < 50: 
                     cv2.circle(image_np, (int(x), int(y)), int(radius),
                                     (0, 255, 255), 2)
                     cv2.circle(image_np, center, 5, (0, 0, 255), -1)
@@ -136,6 +136,7 @@ class image_feature:
                         ball.detected = True
                         ball.radius = radius
                         ball.closeball = 1 
+                        ball.centerx = center[0] 
                         ball.firstdetection = 1
                 ## if the ball is not detected 
                 else: 
@@ -143,7 +144,7 @@ class image_feature:
                     ball.radius = 0 
                     ball.centerx = 0 
                     ball.closeball = 0 
-                    ball.firstdetection = 0 
+                    ball.firstdetection = 0
 
 
                 ## create a message 

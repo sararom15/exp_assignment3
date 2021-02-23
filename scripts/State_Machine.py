@@ -60,6 +60,7 @@ global sleep
 global Finding
 global Target 
 global counter 
+global StopAction
 
 
 ## Initialization and Callback for InfoBall 
@@ -129,13 +130,13 @@ def move_dog(target):
     ## in loop 
     while True: 
         ## if the goal is reached, then cancel the goal 
-        if math.fabs(position.x - target[0]) < 0.1 or math.fabs(position.y - target[1]) < 0.1:
+        if math.fabs(position.x - target[0]) < 0.3 or math.fabs(position.y - target[1]) < 0.3:
             time.sleep(3) 
             rospy.loginfo('Goal reached!!')
             return client.cancel_all_goals() 
              
         ## if a new ball is detected, then cancel the goal 
-        if InfoBall.firstdetection == 1: 
+        if (InfoBall.firstdetection == 1) and (rospy.get_param('StopAction') == 1): 
             return client.cancel_all_goals() 
 
     # Waits for the server to finish performing the action.
@@ -190,23 +191,27 @@ class Normal(smach.State):
         ## in loop 
         while True: 
             ## couter 
+            rospy.set_param('StopAction',1)
             counter = rospy.get_param('counter')
             counter = counter + 1 
             rospy.set_param('counter', counter)
+            rospy.loginfo('%s', rospy.get_param('counter'))
+            time.sleep(4) 
             ## Random motion implementing a move_base action with a random goal   
             Normal = move_dog([random.randrange(-5,6), random.randrange(-5,3)])
 
             ## if camera detects a new ball which has not been detected before 
             if InfoBall.firstdetection == 1: 
+                rospy.set_param('counter', 1)
                 rospy.loginfo('the %s ball has not been detected before!', InfoBall.color)
                 return 'track_ball'
+
                 
             ## after 3 random goal achieved it can switch in sleep or play behavior (randomly choosen)
-            if rospy.get_param('counter') == 3:
+            if rospy.get_param('counter') == 2:
                 rospy.set_param('counter', 0)
                 ## call the function to randomly choose the next behavior
                 self.userAction = user_action() 
-                rospy.loginfo('the user action is %s', self.userAction)
                 ## if play behavior is chosen 
                 if self.userAction == "play": 
                     command = rospy.wait_for_message("UserCommand", String) 
@@ -243,7 +248,7 @@ class Normal_Track(smach.State):
 
     ## execution 
     def execute(self, userdata):
-        rospy.loginfo('reach the ball')
+        rospy.loginfo('follow the ball')
         time.sleep(5) 
         ## if the ball is far away, set the velocity
         while InfoBall.closeball == -1: 
@@ -283,9 +288,11 @@ class Sleep(smach.State):
     def execute(self, userdata): 
         rospy.loginfo('Go to sleep')
         ## call move_base to move to the home position 
+        rospy.set_param('StopAction', 0)
         Sleep = move_dog([rospy.get_param("/home_x"), rospy.get_param("/home_y")])
         ## sleep for a while
         time.sleep(rospy.get_param("/timesleeping"))
+        rospy.loginfo('Good Morning!')
         return 'sleep_to_normal'
 
 
@@ -301,7 +308,7 @@ class Play(smach.State):
     ##execution 
     def execute(self, userdata): 
         rospy.loginfo('my target is %s', rospy.get_param('Target'))
-
+        rospy.set_param('StopAction', 0)
         ## check the index of the list of the room which corresponds to our target
         for index_, room in enumerate(rooms):     
             if room.name == rospy.get_param('Target'): 
@@ -320,6 +327,7 @@ class Play(smach.State):
             Play = move_dog([rooms[index_].x, rooms[index_].y])
             ## call move_base to reach the human position   
             Gohome = move_dog([rospy.get_param("/human_x"), rospy.get_param("/human_y")]) 
+            rospy.loginfo('Hello Friend! How are you?')
             return 'play_to_normal'
 
 ## Find State
@@ -401,7 +409,7 @@ def main():
     rospy.Subscriber("/UserCommand", String, clbk_command)
     rospy.set_param('Finding',0) 
     rospy.set_param('counter', 0) 
-
+    rospy.set_param('StopAction', 0) 
 
     
 
